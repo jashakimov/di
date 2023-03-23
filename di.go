@@ -1,4 +1,4 @@
-package di
+package main
 
 import (
 	"errors"
@@ -17,6 +17,9 @@ func init() {
 }
 
 func Register(obj interface{}) {
+	if reflect.ValueOf(obj).Kind() != reflect.Ptr {
+		panic("Object must be pointer")
+	}
 	if !checkObjByKey(obj, "default") {
 		panic("Object have already exist")
 	}
@@ -26,7 +29,7 @@ func Register(obj interface{}) {
 	})
 }
 
-func Get[T interface{}]() *T {
+func Get[T interface{}]() T {
 	obj, err := getObjByKey[T]("default")
 	if err != nil {
 		panic(err.Error())
@@ -44,7 +47,7 @@ func RegisterWithName(obj interface{}, key string) {
 	})
 }
 
-func GetByName[T interface{}](key string) *T {
+func GetByName[T interface{}](key string) T {
 	obj, err := getObjByKey[T](key)
 	if err != nil {
 		panic(err.Error())
@@ -63,14 +66,24 @@ func checkObjByKey(obj interface{}, key string) bool {
 	return true
 }
 
-func getObjByKey[T interface{}](key string) (*T, error) {
+func getObjByKey[T interface{}](key string) (T, error) {
+	var empty T
+
 	for i := range container {
 		switch container[i].obj.(type) {
-		case *T:
+		case T:
 			if key == container[i].key {
-				return container[i].obj.(*T), nil
+				return container[i].obj.(T), nil
 			}
 		}
 	}
-	return nil, errors.New("object does not exist in container")
+	for i := range container {
+		impl := reflect.TypeOf((*T)(nil)).Elem()
+		if reflect.TypeOf(container[i].obj).Implements(impl) {
+			if key == container[i].key {
+				return container[i].obj.(T), nil
+			}
+		}
+	}
+	return empty, errors.New("object does not exist in container")
 }
